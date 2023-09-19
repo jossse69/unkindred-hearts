@@ -5,10 +5,10 @@ use crate::Game;
 /// This is a generic object: the player, a monster, an item, the stairs...
 /// It's always represented by a character on screen.
 pub(crate) struct Object {
-    x: i32,
-    y: i32,
-    char: char,
-    color: Color,
+   pub x: i32,
+   pub  y: i32,
+   pub char: char,
+   pub  color: Color,
 }
 
 impl Object {

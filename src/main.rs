@@ -18,6 +18,8 @@ const LIMIT_FPS: i32 = 20; // 20 frames-per-second maximum
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 45;
 
+
+
 struct Tcod {
     root: Root,
     con: Offscreen,
@@ -79,26 +81,22 @@ fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game) -> bool {
 }
 
 fn main() {
-    let mut game = Game {
-        // generate map (at this point it's not drawn to the screen)
-        map: make_map(MAP_WIDTH, MAP_HEIGHT),
-    };
-
-    let mut player_x = SCREEN_WIDTH / 2;
-    let mut player_y = SCREEN_HEIGHT / 2;
 
     // create object representing the player
-    let mut player = Object::new(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, '@', YELLOW);
+    let mut player = Object::new(25, 23, '@', YELLOW);
 
-    // create an NPC
-    let npc = Object::new(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2, '@', GREEN);
+    let mut map = make_map(MAP_WIDTH, MAP_HEIGHT, &mut player);
 
-    // the list of objects with those two
-    let mut objects = [player, npc];
+    let mut game = Game {
+        // the map
+        map: map.clone()
+    };
+    // the list of objects
+    let mut objects = [player];
 
     let con = Offscreen::new(MAP_WIDTH, MAP_HEIGHT);
 
-    let mut map = make_map(MAP_WIDTH, MAP_HEIGHT);
+
 
     let root = Root::initializer()
     .font("assets/terminal8x8_gs_ro.png", FontLayout::AsciiInRow)
