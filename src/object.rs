@@ -80,6 +80,7 @@ impl Object {
 
     /// return the position
     pub fn pos(&self) -> (i32, i32) {
+        println!("x: {}, y: {}", self.x, self.y);
         (self.x, self.y)
     }
 

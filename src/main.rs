@@ -45,12 +45,7 @@ struct Game {
 impl Game {
     pub fn find_object(x: i32, y: i32, objects: &[Object]) -> Option<usize> {
         // iterate through the objects array and return the first index that matches
-        for (id, object) in objects.iter().enumerate() {
-            if object.pos() == (x, y) {
-                return Some(id);
-            }
-        }
-        None
+        objects.iter().position(|object| object.pos() == (x, y))
     }
 }
 
@@ -86,20 +81,12 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], map: &mut Ma
     );
 }
 
-fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game, objects: &mut [Object]) -> PlayerAction {
+fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game, objects: &mut Vec<Object>) -> PlayerAction {
     use PlayerAction::*;
     let key = tcod.root.wait_for_keypress(true);
     let player_alive = objects[PLAYER].alive;
     match (key, key.text(), player_alive) {
-        (
-            Key {
-                code: Enter,
-                alt: true,
-                ..
-            },
-            _,
-            _,
-        ) => {
+        (Key { code: Enter, alt: true, .. }, _, _) => {
             // Alt+Enter: toggle fullscreen
             let fullscreen = tcod.root.is_fullscreen();
             tcod.root.set_fullscreen(!fullscreen);
@@ -108,20 +95,50 @@ fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game, objects: &
         (Key { code: Escape, .. }, _, _) => Exit, // exit game
 
         // movement keys
-        (Key { code: NumPad8, .. }, _, true) =>  {player.player_move_or_attack( 0, -1, &game ,objects); TookTurn},
-       (Key { code: NumPad2, .. }, _, true) => {player.player_move_or_attack(0, 1,  &game ,objects); TookTurn},
-        (Key { code: NumPad4, .. }, _, true) => {player.player_move_or_attack( -1, 0, &game, objects); TookTurn},
-        (Key { code: NumPad6, .. }, _, true) => {player.player_move_or_attack(1, 0, &game, objects); TookTurn},
-        (Key { code: NumPad7, .. }, _, true)=> {player.player_move_or_attack( -1, -1, &game, objects); TookTurn},
-        (Key { code: NumPad9, .. }, _, true) => {player.player_move_or_attack( 1, -1, &game, objects); TookTurn},
-        (Key { code: NumPad1, .. }, _, true) => {player.player_move_or_attack( -1, 1, &game, objects); TookTurn},
-        (Key { code: NumPad3, .. } , _, true)=> {player.player_move_or_attack( 1, 1, &game, objects); TookTurn},
-        (Key { code: NumPad5, .. } , _, true)=> {player.player_move_or_attack( -1, 1, &game, objects); TookTurn},
+        (Key { code: NumPad8, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(0, -1, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad2, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(0, 1, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad4, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(-1, 0, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad6, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(1, 0, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad7, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(-1, -1, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad9, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(1, -1, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad1, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(-1, 1, &game, other_objects);
+            TookTurn
+        }
+        (Key { code: NumPad3, .. }, _, true) => {
+            let (player, other_objects) = objects.split_at_mut(PLAYER);
+            player[0].player_move_or_attack(1, 1, &game, other_objects);
+            TookTurn
+        }
 
-        _ => {DidntTakeTurn}
+        _ => DidntTakeTurn
     }
 }
-
 fn main() {
 
     // create object representing the player
@@ -131,7 +148,7 @@ fn main() {
     let mut previous_player_position = (-1, -1);
 
      // the list of objects
-    let mut objects = vec![player.clone()];
+    let mut objects = vec![player];
 
     let mut map = make_map(MAP_WIDTH, MAP_HEIGHT, &mut objects);
 
@@ -170,7 +187,6 @@ fn main() {
     }
 
     render_all(&mut tcod, &mut game, &objects, &mut map, true);
-
     tcod::system::set_fps(LIMIT_FPS);
     while !tcod.root.window_closed() {
         tcod.con.set_default_foreground(WHITE);
@@ -184,7 +200,7 @@ fn main() {
         tcod.root.wait_for_keypress(true);
         // handle keys and exit game if needed
         previous_player_position = objects[PLAYER].pos();
-        let player_action = handle_keys(&mut tcod, &mut player, &mut game, &mut objects);
+        let player_action = handle_keys(&mut tcod, &mut objects[PLAYER], &mut game, &mut objects);
         if player_action == PlayerAction::Exit {
             break;
         };
