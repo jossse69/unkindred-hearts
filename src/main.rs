@@ -39,7 +39,7 @@ enum PlayerAction {
     Exit,
 }
 struct Game {
-    map: Map,
+    map: Map
 }
 
 impl Game {
@@ -136,7 +136,6 @@ fn main() {
     let mut map = make_map(MAP_WIDTH, MAP_HEIGHT, &mut objects);
 
     let mut game = Game {
-        // the map
         map: map.clone()
     };
 
@@ -189,6 +188,8 @@ fn main() {
         if player_action == PlayerAction::Exit {
             break;
         };
+        println!("objects: {:?}", objects);
+
         // let monsters take their turn
         if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
             for object in &objects {

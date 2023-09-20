@@ -55,6 +55,8 @@ impl Object {
     
         // try to find an attackable object there
         let target_id = Game::find_object(x, y, objects);
+
+        println!("target id: {:?}", target_id);
     
         // attack if target found, move otherwise
         if let Some(target_id) = target_id {
