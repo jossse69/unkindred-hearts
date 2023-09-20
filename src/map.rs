@@ -5,15 +5,24 @@ use rand::Rng;
 
 use crate::Game;
 use crate::Tcod;
-use crate::object::Object;
+use crate::object::{Object, is_blocked};
 
 const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
+const COLOR_LIGHT_WALL: Color = Color {
+    r: 130,
+    g: 110,
+    b: 50,
+};
 const COLOR_DARK_GROUND: Color = Color {
     r: 50,
     g: 50,
     b: 150,
 };
-
+const COLOR_LIGHT_GROUND: Color = Color {
+    r: 200,
+    g: 180,
+    b: 50,
+};
 
 //parameters for dungeon generator
 const ROOM_MAX_SIZE: i32 = 10;
@@ -26,13 +35,16 @@ const MAX_ROOMS: i32 = 30;
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Tile {
     pub blocked: bool,
+    pub explored: bool,
     pub block_sight: bool,
 }
+
 
 impl Tile {
     pub fn empty() -> Self {
         Tile {
             blocked: false,
+            explored: false,
             block_sight: false,
         }
     }
@@ -40,6 +52,7 @@ impl Tile {
     pub fn wall() -> Self {
         Tile {
             blocked: true,
+            explored: false,
             block_sight: true,
         }
     }
@@ -47,7 +60,7 @@ impl Tile {
 
 pub(crate) type Map = Vec<Vec<Tile>>;
 
-pub(crate) fn make_map(width: i32, height: i32, player: &mut Object) -> Map {
+pub(crate) fn make_map(width: i32, height: i32, objects: &mut Vec<Object>) -> Map {
     // fill map with "unblocked" tiles
     let mut map = vec![vec![Tile::wall(); height as usize]; width as usize];
 
@@ -79,11 +92,11 @@ pub(crate) fn make_map(width: i32, height: i32, player: &mut Object) -> Map {
 
             if rooms.is_empty() {
                 // this is the first room, where the player starts at
-                player.x = new_x;
-                player.y = new_y;
+                objects[0].set_pos(new_x, new_y);
             } else {
-                // all rooms after the first:
-                // connect it to the previous room with a tunnel
+                
+                // place objects in the other rooms
+                place_objects(new_room, objects, &mut map);
 
                 // center coordinates of the previous room
                 let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
@@ -107,18 +120,36 @@ pub(crate) fn make_map(width: i32, height: i32, player: &mut Object) -> Map {
     map
 }
 
-pub(crate) fn render_map(tcod: &mut Tcod, map: &Map, game: &Game) {
+pub(crate) fn render_map(tcod: &mut Tcod, map: &Map, game: &mut Game) {
     // go through all tiles, and set their background color
     for y in 0..map[0].len() {
         for x in 0..map.len() {
-            let wall = map[x][y].block_sight; // Corrected indexing
-            if wall {
-                tcod.con.set_char_foreground(x as i32, y as i32, COLOR_DARK_WALL);
-                tcod.con.set_char(x as i32, y as i32, '#');
-                    
-            } else {
-                tcod.con.set_char_foreground(x as i32, y as i32, COLOR_DARK_GROUND);
-                tcod.con.set_char(x as i32, y as i32, '.');
+            let visible = tcod.fov.is_in_fov(x as i32, y as i32);
+            let wall = game.map[x as usize][y as usize].block_sight;
+            let color = match (visible, wall) {
+                // outside of field of view:
+                (false, true) => COLOR_DARK_WALL,
+                (false, false) => COLOR_DARK_GROUND,
+                // inside fov:
+                (true, true) => COLOR_LIGHT_WALL,
+                (true, false) => COLOR_LIGHT_GROUND,
+            };
+            let glyph = match game.map[x as usize][y as usize].blocked {
+                false => '.',
+                true => '#',
+                
+                
+            };
+            
+
+            let explored = &mut game.map[x as usize][y as usize].explored;
+            if visible {
+                // since it's visible, explore it
+                *explored = true;
+            }
+            if *explored {
+                // show explored tiles only (any visible tile is explored already)
+                tcod.con.put_char_ex(x as i32, y as i32, glyph, color, BLACK);
             }
         }
     }
@@ -179,5 +210,31 @@ fn create_v_tunnel(y1: i32, y2: i32, x: i32, map: &mut Map) {
     // vertical tunnel
     for y in cmp::min(y1, y2)..(cmp::max(y1, y2) + 1) {
         map[x as usize][y as usize] = Tile::empty();
+    }
+}
+
+pub(crate) fn place_objects(room: Rect, objects: &mut Vec<Object>, map: &mut Map) {
+
+    const MAX_ROOM_MONSTERS: i32 = 3;
+
+    // choose random number of monsters
+    let num_monsters = rand::thread_rng().gen_range(0..MAX_ROOM_MONSTERS + 1);
+
+    for _ in 0..num_monsters {
+        
+        // choose random spot for this monster
+        let x = rand::thread_rng().gen_range(room.x1 + 1..room.x2);
+        let y = rand::thread_rng().gen_range(room.y1 + 1..room.y2);
+        if !is_blocked(x, y, map, objects) {
+            let mut monster = if rand::random::<f32>() < 0.8 {
+                // baby spider
+                Object::new(x, y, 's',"Baby Spider", LIGHT_RED, true)
+            } else {
+                // zombie
+                Object::new(x, y, 'Z', "Zombie", LIGHT_GREEN, true)
+            };
+            monster.alive = true;
+            objects.push(monster);
+        }
     }
 }
