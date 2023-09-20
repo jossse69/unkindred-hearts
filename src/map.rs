@@ -5,7 +5,9 @@ use rand::Rng;
 
 use crate::Game;
 use crate::Tcod;
-use crate::object::{Object, is_blocked};
+use crate::object::Ai;
+use crate::object::DeathCallback;
+use crate::object::{Object, is_blocked, Fighter};
 
 const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
 const COLOR_LIGHT_WALL: Color = Color {
@@ -33,7 +35,7 @@ const MAX_ROOMS: i32 = 30;
 
 /// A tile of the map and its properties
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Tile {
+pub struct Tile {
     pub blocked: bool,
     pub explored: bool,
     pub block_sight: bool,
@@ -228,10 +230,32 @@ pub(crate) fn place_objects(room: Rect, objects: &mut Vec<Object>, map: &mut Map
         if !is_blocked(x, y, map, objects) {
             let mut monster = if rand::random::<f32>() < 0.8 {
                 // baby spider
-                Object::new(x, y, 's',"Baby Spider", LIGHT_RED, true)
+                let mut baby_spider = Object::new(x, y, 's',"Baby Spider", LIGHT_RED, true);
+                baby_spider.fighter = Some(Fighter {
+                    max_hp: 6,
+                    hp: 6,
+                    defense: 0,
+                    power: 2,
+                    magic: 0,
+                    magic_defense: 0,
+                    on_death: DeathCallback::Monster
+                });
+                baby_spider.ai = Some(Ai::Basic);
+                baby_spider
             } else {
                 // zombie
-                Object::new(x, y, 'Z', "Zombie", LIGHT_GREEN, true)
+                let mut zombie = Object::new(x, y, 'Z', "Zombie", LIGHT_GREEN, true);
+                zombie.fighter = Some(Fighter {
+                    max_hp: 15,
+                    hp: 15,
+                    defense: 1,
+                    power: 4,
+                    magic: 0,
+                    magic_defense: 0,
+                    on_death: DeathCallback::Monster
+                });
+                zombie.ai = Some(Ai::Basic);
+                zombie
             };
             monster.alive = true;
             objects.push(monster);
