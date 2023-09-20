@@ -1,5 +1,5 @@
 use rand::Rng;
-use tcod::{colors::*, Console, BackgroundFlag};
+use tcod::{colors::*, Console, BackgroundFlag, input::Mouse, Map as FovMap};
 use std::cmp;
 
 use crate::{Game, map::Map, PLAYER, Tcod};
@@ -182,7 +182,19 @@ pub fn move_towards(id: usize, target_x: i32, target_y: i32, map: &Map, objects:
     move_by(id, dx, dy, map, objects);
 }
 
+/// return a string with the names of all objects under the mouse
+pub fn get_names_under_mouse(mouse: Mouse, objects: &[Object], fov_map: &FovMap) -> String {
+    let (x, y) = (mouse.cx as i32, mouse.cy as i32);
 
+    // create a list with the names of all objects at the mouse's coordinates and in FOV
+    let names = objects
+        .iter()
+        .filter(|obj| obj.pos() == (x, y) && fov_map.is_in_fov(obj.x, obj.y))
+        .map(|obj| obj.name.clone())
+        .collect::<Vec<_>>();
+
+    names.join(", ") // join the names, separated by commas
+}
 
 // combat-related properties and methods (monster, player, NPC).
 #[derive(Clone, Copy, Debug, PartialEq)]

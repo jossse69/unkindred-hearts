@@ -1,10 +1,11 @@
 use object::DeathCallback;
 use object::Fighter;
 use object::ai_take_turn;
+use object::get_names_under_mouse;
 use tcod::colors::*;
 use tcod::console::*;
-use tcod::input::Key;
 use tcod::input::KeyCode::*;
+use tcod::input::{self, Event, Key, Mouse};
 
 mod object;
 use object::Object;
@@ -16,6 +17,7 @@ use tcod::map::{FovAlgorithm, Map as FovMap};
 mod ui;
 
 use ui::{render_bar, Messages};
+
 
 // player will always be the first object
 const PLAYER: usize = 0;
@@ -47,6 +49,8 @@ pub struct Tcod {
     con: Offscreen,
     panel: Offscreen,
     fov: FovMap,    
+    key: Key,  
+    mouse: Mouse,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -135,6 +139,16 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], map: &mut Ma
         tcod.panel.print_rect(MSG_X, y, MSG_WIDTH, 0, msg);
     }
 
+    // display names of objects under the mouse
+    tcod.panel.set_default_foreground(LIGHT_GREY);
+    tcod.panel.print_ex(
+        1,
+        0,
+        BackgroundFlag::None,
+        TextAlignment::Left,
+        get_names_under_mouse(tcod.mouse, objects, &tcod.fov),
+    );
+
     // blit the contents of `panel` to the root console
     blit(
         &tcod.panel,
@@ -149,9 +163,8 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], map: &mut Ma
 
 fn handle_keys(tcod: &mut Tcod, player: &mut Object, mut game: &mut Game, objects: &mut Vec<Object>) -> PlayerAction {
     use PlayerAction::*;
-    let key = tcod.root.wait_for_keypress(true);
     let player_alive = objects[PLAYER].alive;
-    match (key, key.text(), player_alive) {
+    match (tcod.key, tcod.key.text(), player_alive) {
         (Key { code: Enter, alt: true, .. }, _, _) => {
             // Alt+Enter: toggle fullscreen
             let fullscreen = tcod.root.is_fullscreen();
@@ -240,7 +253,8 @@ fn main() {
     .title("unkindred hearts")
     .init();
 
-    let mut tcod = Tcod { root, con, fov: FovMap::new(MAP_WIDTH, MAP_HEIGHT) , panel: Offscreen::new(SCREEN_WIDTH, SCREEN_HEIGHT) };
+    let mut tcod = Tcod { root, con, fov: FovMap::new(MAP_WIDTH, MAP_HEIGHT) , panel: Offscreen::new(SCREEN_WIDTH, SCREEN_HEIGHT), key: Default::default(),
+        mouse: Default::default(), };
 
     
 
@@ -268,6 +282,13 @@ fn main() {
         tcod.con.clear();
 
         let fov_recompute = previous_player_position != (objects[PLAYER].pos());
+
+        match input::check_for_event(input::MOUSE | input::KEY_PRESS) {
+            Some((_, Event::Mouse(m))) => tcod.mouse = m,
+            Some((_, Event::Key(k))) => tcod.key = k,
+            _ => tcod.key = Default::default(),
+        }
+
         render_all(&mut tcod, &mut game, &objects, &mut map, fov_recompute);
 
         tcod.root.flush();
