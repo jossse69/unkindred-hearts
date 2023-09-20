@@ -96,43 +96,35 @@ fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game, objects: &
 
         // movement keys
         (Key { code: NumPad8, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(0, -1, &game, other_objects);
+            player.player_move_or_attack(0, -1, &game, objects);
             TookTurn
         }
         (Key { code: NumPad2, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(0, 1, &game, other_objects);
+            player.player_move_or_attack(0, 1, &game, objects);
             TookTurn
         }
         (Key { code: NumPad4, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(-1, 0, &game, other_objects);
+            player.player_move_or_attack(-1, 0, &game, objects);
             TookTurn
         }
         (Key { code: NumPad6, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(1, 0, &game, other_objects);
+            player.player_move_or_attack(1, 0, &game, objects);
             TookTurn
         }
         (Key { code: NumPad7, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(-1, -1, &game, other_objects);
+            player.player_move_or_attack(-1, -1, &game, objects);
             TookTurn
         }
         (Key { code: NumPad9, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(1, -1, &game, other_objects);
+            player.player_move_or_attack(1, -1, &game, objects);
             TookTurn
         }
         (Key { code: NumPad1, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(-1, 1, &game, other_objects);
+            player.player_move_or_attack(-1, 1, &game, objects);
             TookTurn
         }
         (Key { code: NumPad3, .. }, _, true) => {
-            let (player, other_objects) = objects.split_at_mut(PLAYER);
-            player[0].player_move_or_attack(1, 1, &game, other_objects);
+            player.player_move_or_attack(1, 1, &game, objects);
             TookTurn
         }
 
@@ -186,6 +178,8 @@ fn main() {
         }
     }
 
+    let mut player_action = PlayerAction::DidntTakeTurn; // Declare and initialize player_action before the loop
+
     render_all(&mut tcod, &mut game, &objects, &mut map, true);
     tcod::system::set_fps(LIMIT_FPS);
     while !tcod.root.window_closed() {
@@ -200,11 +194,12 @@ fn main() {
         tcod.root.wait_for_keypress(true);
         // handle keys and exit game if needed
         previous_player_position = objects[PLAYER].pos();
-        let player_action = handle_keys(&mut tcod, &mut objects[PLAYER], &mut game, &mut objects);
-        if player_action == PlayerAction::Exit {
-            break;
-        };
-        println!("objects: {:?}", objects);
+        {
+            player_action = handle_keys(&mut tcod, &mut objects[PLAYER].clone(), &mut game, &mut objects);
+            if player_action == PlayerAction::Exit {
+                break;
+            }
+        }
 
         // let monsters take their turn
         if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {

@@ -56,11 +56,10 @@ impl Object {
         // try to find an attackable object there
         let target_id = Game::find_object(x, y, objects);
 
-        println!("target id: {:?}", target_id);
     
         // attack if target found, move otherwise
-        if let Some(target_id) = target_id {
-            print!("{} attacks {}!", self.name, objects[target_id].name);
+        if target_id.is_some(){
+            println!("{} attacks {}!", self.name, objects[target_id.unwrap()].name);
         } else {
             self.move_by(PLAYER, dx, dy, &game.map, objects);
         }
@@ -80,7 +79,6 @@ impl Object {
 
     /// return the position
     pub fn pos(&self) -> (i32, i32) {
-        println!("x: {}, y: {}", self.x, self.y);
         (self.x, self.y)
     }
 
