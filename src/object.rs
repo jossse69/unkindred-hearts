@@ -48,7 +48,7 @@ impl Object {
 
     
     /// move or attack by the given destination
-    pub fn player_move_or_attack(&mut self, dx: i32, dy: i32, game: &Game, objects: &mut [Object]) {
+    pub fn player_move_or_attack(&mut self, dx: i32, dy: i32, game: &mut Game, objects: &mut [Object]) {
         let x = self.x + dx;
         let y = self.y + dy;
 // try to find an attackable object there
@@ -58,7 +58,7 @@ let target_id = objects
 
         if let Some(target_id) = target_id {
             let (player, target) = mut_two(PLAYER, target_id, objects);
-            player.attack(target);
+            player.attack(target, game);
         } else {
             move_by(PLAYER, dx, dy, &game.map, objects);
         }
@@ -89,7 +89,7 @@ let target_id = objects
         ((dx.pow(2) + dy.pow(2)) as f32).sqrt()
     }
 
-    pub fn take_damage(&mut self, damage: i32) {
+    pub fn take_damage(&mut self, damage: i32, game: &mut Game) {
         // apply damage if possible
         if let Some(fighter) = self.fighter.as_mut() {
             if damage > 0 {
@@ -101,25 +101,31 @@ let target_id = objects
         if let Some(fighter) = self.fighter {
             if fighter.hp <= 0 {
                 self.alive = false;
-                fighter.on_death.callback(self);
+                fighter.on_death.callback(self, game);
             }
         }
     }
 
-    pub fn attack(&mut self, target: &mut Object) {
+    pub fn attack(&mut self, target: &mut Object, game: &mut Game) {
         // a simple(ish) formula for attack damage
         let damage = self.fighter.map_or(0, |f| f.power) - target.fighter.map_or(0, |f| f.defense) / 4;
         if damage > 0 {
             // make the target take some damage
-            println!(
-                "{} attacks {} for {} hit points.",
-                self.name, target.name, damage
+            game.messages.add(
+                format!(
+                    "{} attacks {} for {} hit points.",
+                    self.name, target.name, damage
+                ),
+                WHITE,
             );
-            target.take_damage(damage);
+            target.take_damage(damage, game);
         } else {
-            println!(
-                "{} attacks {} but it has no effect!",
-                self.name, target.name
+            game.messages.add(
+                format!(
+                    "{} attacks {} but it has no effect!",
+                    self.name, target.name
+                ),
+                WHITE,
             );
         }
     }
@@ -133,7 +139,7 @@ pub fn move_by(id: usize, dx: i32, dy: i32, map: &Map, objects: &mut [Object]) {
     }
 }
 
-pub fn ai_take_turn(monster_id: usize, tcod: &Tcod, game: &Game, objects: &mut [Object]) {
+pub fn ai_take_turn(monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut [Object]) {
     // a basic monster takes its turn. If you can see it, it can see you
     let (monster_x, monster_y) = objects[monster_id].pos();
     if tcod.fov.is_in_fov(monster_x, monster_y) {
@@ -147,7 +153,7 @@ pub fn ai_take_turn(monster_id: usize, tcod: &Tcod, game: &Game, objects: &mut [
             {
                 // close enough, attack! (if the player is still alive.)
                 let (monster, player) = mut_two(monster_id, PLAYER, objects);
-                monster.attack(player);
+                monster.attack(player, game);
             }
         } else {
             // just move in a random direction
@@ -222,19 +228,19 @@ pub enum DeathCallback {
 }
 
 impl DeathCallback {
-    fn callback(self, object: &mut Object) {
+    fn callback(self, object: &mut Object, game: &mut Game) {
         use DeathCallback::*;
-        let callback: fn(&mut Object) = match self {
+        let callback: fn(&mut Object, &mut Game) = match self {
             Player => player_death,
             Monster => monster_death,
         };
-        callback(object);
+        callback(object, game);
     }
 }
 
-fn player_death(player: &mut Object) {
+fn player_death(player: &mut Object, game: &mut Game) {
     // the game ended!
-    println!("Your fragle body smashes into blood and guts! your unkindred soul will be in torment... forever. lil' warm unkindred heart...");
+    game.messages.add("Your fragle body smashes into blood and guts! your unkindred soul will be in torment... forever. lil' warm unkindred heart...", RED);
     
     player.alive = false;
 
@@ -243,10 +249,11 @@ fn player_death(player: &mut Object) {
     player.color = DARK_RED;
 }
 
-fn monster_death(monster: &mut Object) {
+fn monster_death(monster: &mut Object, game: &mut Game) {
     // transform it into a nasty corpse! it doesn't block, can't be
     // attacked and doesn't move
-    println!("{} dies!", monster.name);
+    game.messages
+    .add(format!("{} dies!", monster.name), ORANGE);
     monster.char = '%';
     monster.color = DARK_RED;
     monster.blocks = false;

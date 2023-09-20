@@ -13,6 +13,9 @@ mod map;
 use map::{Map, make_map, render_map};
 use tcod::map::{FovAlgorithm, Map as FovMap};
 
+mod ui;
+
+use ui::{render_bar, Messages};
 
 // player will always be the first object
 const PLAYER: usize = 0;
@@ -21,17 +24,28 @@ const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
 
 const LIMIT_FPS: i32 = 30; 
-
+// size of the map
 const MAP_WIDTH: i32 = 80;
-const MAP_HEIGHT: i32 = 45;
+const MAP_HEIGHT: i32 = 43; 
+
+// sizes and coordinates relevant for the GUI
+const BAR_WIDTH: i32 = 20;
+const PANEL_HEIGHT: i32 = 7;
+const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
+
 
 const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic; // default FOV algorithm
 const FOV_LIGHT_WALLS: bool = true; // light walls or not
 const FOV_RADIUS: i32 = 8;
 
+const MSG_X: i32 = BAR_WIDTH + 2;
+const MSG_WIDTH: i32 = SCREEN_WIDTH - BAR_WIDTH - 2;
+const MSG_HEIGHT: usize = PANEL_HEIGHT as usize - 1;
+
 pub struct Tcod {
     root: Root,
     con: Offscreen,
+    panel: Offscreen,
     fov: FovMap,    
 }
 
@@ -42,7 +56,8 @@ pub enum PlayerAction {
     Exit,
 }
 pub struct Game {
-    map: Map
+    map: Map,
+    messages: Messages,
 }
 
 impl Game {
@@ -76,6 +91,7 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], map: &mut Ma
         object.draw(&mut tcod.con);
     }
 
+
     
     // blit the contents of "con" to the root console
     blit(
@@ -88,20 +104,50 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], map: &mut Ma
         1.0,
     );
 
+    // prepare to render the GUI panel
+    tcod.panel.set_default_background(BLACK);
+    tcod.panel.clear();
+
     // show the player's stats
-    tcod.root.set_default_foreground(WHITE);
-    if let Some(fighter) = objects[PLAYER].fighter {
-        tcod.root.print_ex(
-            1,
-            SCREEN_HEIGHT - 2,
-            BackgroundFlag::None,
-            TextAlignment::Left,
-            format!("HP: {}/{} ", fighter.hp, fighter.max_hp),
-        );
+    let hp = objects[PLAYER].fighter.map_or(0, |f| f.hp);
+    let max_hp = objects[PLAYER].fighter.map_or(0, |f| f.max_hp);
+    render_bar(
+        &mut tcod.panel,
+        1,
+        1,
+        BAR_WIDTH,
+        "HP",
+        hp,
+        max_hp,
+        LIGHT_RED,
+        DARKER_RED,
+    );
+
+    // print the game messages, one line at a time
+    let mut y = MSG_HEIGHT as i32;
+    for &(ref msg, color) in game.messages.iter().rev() {
+        let msg_height = tcod.panel.get_height_rect(MSG_X, y, MSG_WIDTH, 0, msg);
+        y -= msg_height;
+        if y < 0 {
+            break;
+        }
+        tcod.panel.set_default_foreground(color);
+        tcod.panel.print_rect(MSG_X, y, MSG_WIDTH, 0, msg);
     }
+
+    // blit the contents of `panel` to the root console
+    blit(
+        &tcod.panel,
+        (0, 0),
+        (SCREEN_WIDTH, PANEL_HEIGHT),
+        &mut tcod.root,
+        (0, PANEL_Y),
+        1.0,
+        1.0,
+    );
 }
 
-fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game, objects: &mut Vec<Object>) -> PlayerAction {
+fn handle_keys(tcod: &mut Tcod, player: &mut Object, mut game: &mut Game, objects: &mut Vec<Object>) -> PlayerAction {
     use PlayerAction::*;
     let key = tcod.root.wait_for_keypress(true);
     let player_alive = objects[PLAYER].alive;
@@ -116,35 +162,35 @@ fn handle_keys(tcod: &mut Tcod, player: &mut Object, game: &mut Game, objects: &
 
         // movement keys
         (Key { code: NumPad8, .. }, _, true) => {
-            player.player_move_or_attack(0, -1, &game, objects);
+            player.player_move_or_attack(0, -1, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad2, .. }, _, true) => {
-            player.player_move_or_attack(0, 1, &game, objects);
+            player.player_move_or_attack(0, 1, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad4, .. }, _, true) => {
-            player.player_move_or_attack(-1, 0, &game, objects);
+            player.player_move_or_attack(-1, 0, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad6, .. }, _, true) => {
-            player.player_move_or_attack(1, 0, &game, objects);
+            player.player_move_or_attack(1, 0, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad7, .. }, _, true) => {
-            player.player_move_or_attack(-1, -1, &game, objects);
+            player.player_move_or_attack(-1, -1, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad9, .. }, _, true) => {
-            player.player_move_or_attack(1, -1, &game, objects);
+            player.player_move_or_attack(1, -1, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad1, .. }, _, true) => {
-            player.player_move_or_attack(-1, 1, &game, objects);
+            player.player_move_or_attack(-1, 1, &mut game, objects);
             TookTurn
         }
         (Key { code: NumPad3, .. }, _, true) => {
-            player.player_move_or_attack(1, 1, &game, objects);
+            player.player_move_or_attack(1, 1, &mut game, objects);
             TookTurn
         }
 
@@ -175,7 +221,8 @@ fn main() {
     let mut map = make_map(MAP_WIDTH, MAP_HEIGHT, &mut objects);
 
     let mut game = Game {
-        map: map.clone()
+        map: map.clone(),
+        messages: Messages::new()
     };
 
     
@@ -193,7 +240,7 @@ fn main() {
     .title("unkindred hearts")
     .init();
 
-    let mut tcod = Tcod { root, con, fov: FovMap::new(MAP_WIDTH, MAP_HEIGHT) };
+    let mut tcod = Tcod { root, con, fov: FovMap::new(MAP_WIDTH, MAP_HEIGHT) , panel: Offscreen::new(SCREEN_WIDTH, SCREEN_HEIGHT) };
 
     
 
@@ -209,6 +256,10 @@ fn main() {
     }
 
     let mut player_action = PlayerAction::DidntTakeTurn; // Declare and initialize player_action before the loop
+
+    // a warm welcoming message!
+    game.messages.add("Welcome, unkindred soul. the void is trying to source of the Fostering Benevolence!", YELLOW);
+    game.messages.add("this will spread the void to the rest of the world! save us all before it!", YELLOW);
 
     render_all(&mut tcod, &mut game, &objects, &mut map, true);
     tcod::system::set_fps(LIMIT_FPS);
@@ -238,7 +289,7 @@ fn main() {
                 if id != PLAYER {
                     let object = &mut objects[id];
                     if object.ai.is_some() {
-                        ai_take_turn(id, &tcod, &game, &mut objects);
+                        ai_take_turn(id, &tcod, &mut game, &mut objects);
                     }
                 }
             }
